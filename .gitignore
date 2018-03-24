@@ -1,6 +1,7 @@
+node_modules/
 .vscode/
-dist/
 .git/
+dist/
 app/css/
 app/fonts/
 **/_backstage
@@ -8,9 +9,9 @@ app/fonts/
 **/*.DS_Store
 preview/
 fonts/
-node_modules/
-yarn.lock
 build/
+css/*.css
+yarn.lock
 .DS_Store
 Thumbs.db
 .idea
@@ -19,4 +20,3 @@ Thumbs.db
 *.psd
 *.ai
 *.pdf
-css/*.css
