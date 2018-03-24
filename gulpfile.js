@@ -1,152 +1,129 @@
-var gulp = require('gulp'); // Подключаем Gulp
-var browserSync = require('browser-sync').create(); // Подключаем browser-sync
-var sass = require('gulp-sass'); // Подключаем Sass пакет
-var autoprefixer = require('gulp-autoprefixer');
-var fs = require('fs');
-var pug = require('gulp-pug');
-var notify = require('gulp-notify');
-var rigger = require('gulp-rigger'); // работа с инклюдами в html и js;
-var cleanCSS = require('gulp-clean-css');
-var sourcemaps = require('gulp-sourcemaps');
-var gcmq = require('gulp-group-css-media-queries');
+var gulp           = require('gulp'),
+		gutil          = require('gulp-util' ),
+		sass           = require('gulp-sass'),
+		browserSync    = require('browser-sync'),
+		concat         = require('gulp-concat'),
+		uglify         = require('gulp-uglify'),
+		cleanCSS       = require('gulp-clean-css'),
+		rename         = require('gulp-rename'),
+		del            = require('del'),
+		imagemin       = require('gulp-imagemin'),
+		cache          = require('gulp-cache'),
+		autoprefixer   = require('gulp-autoprefixer'),
+		ftp            = require('vinyl-ftp'),
+		notify         = require("gulp-notify"),
+		rsync          = require('gulp-rsync');
 
+// Пользовательские скрипты проекта
 
-var path = {
-  build: { // Тут мы укажем куда складывать готовые после сборки файлы
-    html: './build/',
-    css: './build/css/',
-    img: './build/img/',
-    js: './build/js/',
-    font: './build/fonts/',
-    pug: './build/',
-  },
-  src: { // Пути откуда брать исходники
-    html: './src/html/pages/*.html', // Синтаксис [^_]*.html говорит gulp что мы хотим взять все файлы с расширением .html, кроме начинающихся с _
-    css: './src/sass/*.*',
-    img: './src/img/*.*',
-    js: './src/js/*.*',
-    font: './src/fonts/*.*',
-    pug: './src/pug/pages/*.pug',
-    normalize: './node_modules/normalize.css/normalize.css',
-  },
-  watch: { // Тут мы укажем, за изменением каких файлов мы хотим наблюдать
-    html: './src/html/**/*.html',
-    css: ['./src/sass/**/*.sass', 'src/sass/**/*.scss'],
-    js: './src/js/*.*',
-    pug: './src/pug/**/*.pug',
-  },
-  clean: './build', // директории которые могут очищаться
-  outputDir: './build', // исходная корневая директория для запуска минисервера
-};
-
-
-// Static Server
-gulp.task('webserver', () => {
-  browserSync.init({
-    server: [path.outputDir],
-  });
+gulp.task('common-js', function() {
+	return gulp.src([
+		'app/js/common.js',
+		])
+	.pipe(concat('common.min.js'))
+	.pipe(uglify())
+	.pipe(gulp.dest('app/js'));
 });
 
-gulp.task('watch', () => {
-  gulp.watch([path.watch.html], ['rigger:build']); // билдим html в случае изменения
-  gulp.watch([path.watch.pug], ['pug:build']); // Наблюдение за pug файлами
-  gulp.watch([path.watch.css], ['css:build']); // Наблюдение за sass файлами в папке sass
-  gulp.watch([path.watch.js], ['js:build']); // Наблюдение за js файлами
-  gulp.watch('build/*.html').on('change', browserSync.reload);
+gulp.task('js', ['common-js'], function() {
+	return gulp.src([
+		'app/libs/jquery/dist/jquery.min.js',
+		'app/js/common.min.js', // Всегда в конце
+		])
+	.pipe(concat('scripts.min.js'))
+	// .pipe(uglify()) // Минимизировать весь js (на выбор)
+	.pipe(gulp.dest('app/js'))
+	.pipe(browserSync.reload({stream: true}));
 });
 
-gulp.task('copy', () =>
-  gulp.src(path.src.img)
-    .pipe(gulp.dest(path.build.img)), // выгрузим их в папку build
-);
+gulp.task('browser-sync', function() {
+	browserSync({
+		server: {
+			baseDir: 'app'
+		},
+		// notify: false,
+		// tunnel: true,
+		// tunnel: "projectmane", //Demonstration page: http://projectmane.localtunnel.me
+	});
+});
 
-gulp.task('copy:img', () =>
-  gulp.src(path.src.img)
-    .pipe(gulp.dest(path.build.img)));
+gulp.task('sass', function() {
+	return gulp.src(['app/sass/**/*.sass', 'app/sass/**/*.scss'])
+	.pipe(sass({outputStyle: 'expand'}).on("error", notify.onError()))
+	.pipe(rename({suffix: '.min', prefix : ''}))
+	.pipe(autoprefixer(['last 15 versions']))
+//	.pipe(cleanCSS()) // Опционально, закомментировать при отладке
+	.pipe(gulp.dest('app/css'))
+	.pipe(browserSync.reload({stream: true}));
+});
 
-gulp.task('copy:font', () =>
-  gulp.src(path.src.font)
-    .pipe(gulp.dest(path.build.font)));
+gulp.task('watch', ['sass', 'js', 'browser-sync'], function() {
+	gulp.watch(['app/sass/**/*.sass', 'app/sass/**/*.scss'], ['sass']);
+	gulp.watch(['libs/**/*.js', 'app/js/common.js'], ['js']);
+	gulp.watch('app/*.html', browserSync.reload);
+});
 
+gulp.task('imagemin', function() {
+	return gulp.src('app/img/**/*')
+	.pipe(cache(imagemin())) // Cache Images
+	.pipe(gulp.dest('dist/img')); 
+});
 
-// Compile pug into HTML & auto-inject into browsers
-gulp.task('pug:build', () =>
-  gulp.src(path.src.pug)
-    .pipe(pug({
-      locals: {
-        nav: JSON.parse(fs.readFileSync('./src/pug/data/navigation.json', 'utf8')),
-        content: JSON.parse(fs.readFileSync('./src/pug/data/content.json', 'utf8')),
-      },
-      pretty: true,
-    }))
-    .on('error', notify.onError(error => ({
-      title: 'Pug',
-      message: error.message,
-    })))
-    .pipe(gulp.dest(path.build.html)) // выгрузим их в папку build
-    .pipe(browserSync.reload({
-      stream: true,
-    })));
+gulp.task('build', ['removedist', 'imagemin', 'sass', 'js'], function() {
 
-// таск для билдинга html через rigger
-gulp.task('rigger:build', () =>
-  gulp.src(path.src.html) // Выберем файлы по нужному пути
-    .pipe(rigger()) // Прогоним через rigger
-    .on('error', notify.onError(error => ({
-      title: 'Rigger',
-      message: error.message,
-    })))
-    // .pipe(plumber.stop())
-    .pipe(gulp.dest(path.build.html)) // выгрузим их в папку build
-    .pipe(browserSync.reload({
-      stream: true, // И перезагрузим наш сервер для обновлений
-    })));
+	var buildFiles = gulp.src([
+		'app/*.html',
+		'app/.htaccess',
+		]).pipe(gulp.dest('dist'));
 
-// Compile sass into CSS & auto-inject into browsers
-gulp.task('css:build', () => gulp.src(path.src.css) // Берем источник
-  .pipe(sass({
-    outputStyle: 'expanded',
-  }).on('error', sass.logError)) // Преобразуем Sass в CSS посредством gulp-sass
+	var buildCss = gulp.src([
+		'app/css/main.min.css',
+		]).pipe(gulp.dest('dist/css'));
 
-  .pipe(gcmq())
+	var buildJs = gulp.src([
+		'app/js/scripts.min.js',
+		]).pipe(gulp.dest('dist/js'));
 
-  .pipe(autoprefixer({
-    browsers: ['> 0.1%'],
-    cascade: false,
-  }))
+	var buildFonts = gulp.src([
+		'app/fonts/**/*',
+		]).pipe(gulp.dest('dist/fonts'));
 
-  .pipe(cleanCSS({
-    level: 2,
-  }))
+});
 
-  .pipe(sourcemaps.write('../maps'))
+gulp.task('deploy', function() {
 
-  .pipe(gulp.dest(path.build.css)) // Выгружаем результат в папку css
+	var conn = ftp.create({
+		host:      'hostname.com',
+		user:      'username',
+		password:  'userpassword',
+		parallel:  10,
+		log: gutil.log
+	});
 
-  .pipe(browserSync.reload({
-    stream: true,
-  })));
+	var globs = [
+	'dist/**',
+	'dist/.htaccess',
+	];
+	return gulp.src(globs, {buffer: false})
+	.pipe(conn.dest('/path/to/folder/on/server'));
 
-gulp.task('js:build', () => gulp.src(path.src.js)
-  .pipe(gulp.dest(path.build.js)) // выгрузим их в папку build
-  .pipe(browserSync.reload({
-    stream: true,
-  })));
+});
 
-gulp.task('build', [
-  'js:build',
-  'rigger:build', // или pug, или rigger, раскомментировать
-  // 'pug:build',
-  'css:build',
-  'copy',
-]);
+gulp.task('rsync', function() {
+	return gulp.src('dist/**')
+	.pipe(rsync({
+		root: 'dist/',
+		hostname: 'username@yousite.com',
+		destination: 'yousite/public_html/',
+		// include: ['*.htaccess'], // Скрытые файлы, которые необходимо включить в деплой
+		recursive: true,
+		archive: true,
+		silent: false,
+		compress: true
+	}));
+});
 
-gulp.task('default', ['build', 'watch', 'webserver']);
+gulp.task('removedist', function() { return del.sync('dist'); });
+gulp.task('clearcache', function () { return cache.clearAll(); });
 
-// gulp.task('default', gulp.series(
-//     'build',
-//     gulp.parallel(
-//         'watch',
-//         'webserver'
-//     )
-// )); .. синтаксис gulp 4
+gulp.task('default', ['watch']);
