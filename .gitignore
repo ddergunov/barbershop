@@ -1,0 +1,14 @@
+/node_modules/
+/.vscode/
+/dist/
+/build/
+/.git/
+/src/css/
+/src/fonts/
+/**/_backstage
+/**/Thumbs.db
+/**/*.DS_Store
+/preview/
+/fonts/
+*.psd
+*.pdf

@@ -1,0 +1,23 @@
+section.modal.modal-letter
+    h2 Напишите нам письмо
+    form.letter-form(action='https://echo.htmlacademy.ru', method='post')
+        p
+            label
+                | Ваше имя
+                input.letter-form__user(type='text', name='user', placeholder='Представьтесь, пожалуйста')
+        p
+            label
+                | Ваш e-mail
+                input.letter-form__mail(type='text', name='mail', placeholder='Для отправки ответа')
+        p
+            label
+                | Текст письма
+                input.letter-form__text(type='text', name='letter_text', placeholder='В свободной форме')
+        button.button.button--wide(type='submit') Отпраить
+    button.modal-close Закрыть
+section.modal.modal-map
+    p.modal.modal-map__1
+        img(src='img/Map1.jpg', alt='Компания... Адрес...')
+    p.modal.modal-map__2
+        img(src='img/Map2.jpg', alt='Компания... Адрес...')
+    button.modal-close Закрыть
