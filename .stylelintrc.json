@@ -1,16 +1,3 @@
 {
-  "extends": "stylelint-config-recommended-scss",
-  "rules": {
-    "block-no-empty": null,
-    "unit-whitelist": ["em", "rem", "s", "px", "%", "deg"],
-    "block-closing-brace-newline-after": "always",
-    "color-no-invalid-hex": true,
-    "indentation": 2,
-    "property-no-unknown": true,
-    "max-empty-lines": 1,
-    "value-keyword-case": "lower",
-    "at-rule-empty-line-before": null,
-    "rule-empty-line-before": null,
-    "no-descending-specificity": null
-  }
+  "extends": "stylelint-config-htmlacademy"
 }
